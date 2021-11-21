@@ -5,6 +5,7 @@ import android.hardware.usb.UsbManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.storage.StorageManager
 import android.system.Os
 import android.util.Log
@@ -29,14 +30,18 @@ class MainActivity : AppCompatActivity() {
 
         prefs = getSharedPreferences("prefs", 0)
 
-        val permissionButton = findViewById<Button>(R.id.permissionButton)
-        permissionButton.setOnClickListener {
+        binding.permissionButton.setOnClickListener {
             promptSAFPermissions()
         }
 
         registerBroadcastReceivers()
 
         binding.measureMethodButton.setOnClickListener {
+            if (prefs.getString(PREFS_PERSISTABLE_URI, "")!!.isEmpty()) {
+                Toast.makeText(this, "USB permission not yet granted", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+
             var freeDriveSpace: Long
             val timeInMillis = measureTimeMillis {
                 val persistedUri = Uri.parse(prefs.getString(PREFS_PERSISTABLE_URI, ""))
@@ -54,15 +59,19 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun promptSAFPermissions() {
+        var intent: Intent? = null
         val storageManager = getSystemService(Context.STORAGE_SERVICE) as StorageManager
         val storageVolumes = storageManager.storageVolumes
         storageVolumes.forEach {
             if (it.isRemovable) {
-                val intent = it.createOpenDocumentTreeIntent()
-                startActivityForResult(intent, SAF_PERMISSION_REQUEST_CODE)
-                return
+                intent = it.createOpenDocumentTreeIntent()
+                return@forEach
             }
         }
+        if (intent == null) {
+            intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+        }
+        startActivityForResult(intent, SAF_PERMISSION_REQUEST_CODE)
     }
 
 
